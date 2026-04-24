@@ -955,18 +955,10 @@ let pendingPhotoFile    = null;
 
 let currentUser = null;
 let currentRole = 'nowy';
+let appReady    = false;
 
 /* ============================================================  AUTH  */
 async function initAuth() {
-  sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
-      currentUser = session.user;
-      await afterSignIn();
-    } else if (event === 'SIGNED_OUT') {
-      currentUser = null; currentRole = 'nowy';
-      showLogin();
-    }
-  });
   const { data:{ session } } = await sb.auth.getSession();
   if (session) {
     currentUser = session.user;
@@ -974,6 +966,19 @@ async function initAuth() {
   } else {
     showLogin();
   }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session && !appReady) {
+      // magic link redirect — użytkownik właśnie kliknął link w mailu
+      currentUser = session.user;
+      await afterSignIn();
+    } else if (event === 'SIGNED_OUT') {
+      appReady = false;
+      currentUser = null; currentRole = 'nowy';
+      showLogin();
+    }
+    // TOKEN_REFRESHED i INITIAL_SESSION ignorujemy — nie przeładowujemy danych
+  });
 }
 
 async function afterSignIn() {
@@ -1026,6 +1031,7 @@ function showLogin() {
 }
 
 function showApp() {
+  appReady = true;
   document.getElementById('ov-login').classList.remove('open');
   document.getElementById('app-loading').classList.remove('open');
   document.getElementById('app-container').style.display = '';
