@@ -116,6 +116,11 @@ header::before{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;b
 .cat-chip[data-ci="3"].active{background:var(--c3-bg);color:var(--c3-fg);border-color:var(--c3-br);}
 .cat-chip[data-ci="4"].active{background:var(--c4-bg);color:var(--c4-fg);border-color:var(--c4-br);}
 .cat-chip[data-ci="5"].active{background:var(--c5-bg);color:var(--c5-fg);border-color:var(--c5-br);}
+.cat-drill-crumb { font-family: var(--mono); font-size: .65rem; color: var(--primary); letter-spacing: .08em; padding: 0 6px; align-self: center; }
+.cat-sublist { padding: 2px 0 6px 28px; display: flex; flex-direction: column; gap: 4px; }
+.cat-sub-item { display: flex; align-items: center; gap: 8px; }
+.cat-subcat-add { display: none; gap: 8px; align-items: center; padding: 4px 0 4px 28px; }
+.cat-subcat-add input { flex: 1; }
 
 /* SUMMARY BAR */
 .summary-bar{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);margin-bottom:20px;}
@@ -341,14 +346,21 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
 
 /* PRINT */
 @media print{
-  body{background:#fff !important;color:#000;}
+  body{background:#fff !important;color:#000 !important;}
   body::before,body::after,.container::before{display:none;}
-  header{background:#041525 !important;-webkit-print-color-adjust:exact;}
+  header{background:#fff !important;border-bottom:2px solid #000;padding:8px 16px;}
+  .header-title h1{color:#000 !important;text-shadow:none !important;}
+  .header-status,.header-user,.theme-toggle,#btn-admin,.btn-logout{display:none !important;}
+  .print-date{display:inline !important;font-size:.75rem;color:#333;margin-left:12px;font-family:monospace;}
   .toolbar,.cat-filter,.summary-bar,.card-actions,.close-btn,
-  .btn-icon,.toast-container,.view-toggle,.cards-grid,.zest-float{display:none !important;}
+  .btn-icon,.toast-container,.view-toggle,.cards-grid,.zest-float,
+  .search-wrap,#sort-sel,.tab-nav{display:none !important;}
   .table-wrap{display:block !important;}
-  table{font-size:9pt;}
-  .thumb,.thumb-ph,.chk-col,.td-acts{display:none;}
+  table{font-size:9pt;border-collapse:collapse;width:100%;}
+  th{background:#f0f0f0 !important;color:#000 !important;border:1px solid #333 !important;-webkit-print-color-adjust:exact;padding:4px 6px;}
+  td{border:1px solid #555;padding:4px 6px;color:#000 !important;}
+  .td-net,.td-gross{font-weight:700;}
+  .thumb,.thumb-ph,.chk-col,.td-acts,.col-cat,.no-print{display:none !important;}
   body.print-zest .table-wrap{display:none !important;}
   body.print-zest .zest-print-sheet{display:block !important;}
   body:not(.print-zest) .zest-print-sheet{display:none;}
@@ -477,6 +489,7 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
       <h1>Katalog Części Pojazdów</h1>
       <p>naczepy :: przyczepy :: ciągniki_rolnicze :: parts_database</p>
     </div>
+    <span class="print-date" style="display:none" id="print-date"></span>
     <div class="header-status">
       <div class="storage-ind">
         <span id="storage-txt">—</span>
@@ -533,7 +546,7 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Import CSV/XLSX
     </button>
-    <button class="btn btn-outline btn-sm" onclick="exportXlsx()">
+    <button class="btn btn-outline btn-sm" id="btn-export" onclick="exportXlsx()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Eksport XLSX
     </button>
@@ -562,7 +575,7 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
       </div>
-      <button class="btn btn-outline btn-sm" onclick="openSyncModal()">
+      <button class="btn btn-outline btn-sm" id="btn-sync" onclick="openSyncModal()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.38"/></svg>
         Sync / JSON
       </button>
@@ -605,13 +618,17 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
       <div class="fg2">
         <div>
           <label>Kategoria *</label>
-          <select id="m-cat"></select>
+          <select id="m-cat" onchange="updateSubcatSelect()"></select>
         </div>
         <div>
           <label>Nazwa części *</label>
           <input id="m-name" type="text" placeholder="np. Oś przednia kompletna" autocomplete="off" list="name-list">
           <datalist id="name-list"></datalist>
         </div>
+      </div>
+      <div id="subcat-row" style="display:none">
+        <label>Podkategoria</label>
+        <select id="m-subcat"></select>
       </div>
       <div>
         <label>Cena (VAT 23%)</label>
@@ -740,7 +757,7 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
     <div class="zest-header-row">
       <div class="zest-discount-wrap">
         <label>Rabat ogólny</label>
-        <input id="zest-disc" type="number" min="0" max="99" step="0.5" value="0" class="discount-inp" oninput="renderZestTable()">
+        <input id="zest-disc" type="number" min="0" max="99" step="0.5" value="0" class="discount-inp" oninput="renderZestTable();renderSummary()">
         <span style="font-family:var(--mono);font-size:.85rem;color:var(--accent)">%</span>
       </div>
       <span style="flex:1"></span>
@@ -913,7 +930,10 @@ input[type="checkbox"]{width:auto;padding:0;border:1px solid var(--border-bright
       <strong style="color:var(--accent)">admin</strong> — pełny dostęp + ten panel
     </div>
     <div id="admin-users-list"></div>
-    <div class="modal-actions">
+    <div class="modal-actions" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-danger btn-sm" id="btn-del-selected" style="display:none" onclick="deleteSelectedUsers()">
+        Usuń zaznaczonych (<span id="del-sel-count">0</span>)
+      </button>
       <button class="btn btn-outline" onclick="closeAdmin()">Zamknij</button>
       <button class="btn btn-outline btn-sm" onclick="renderAdminUsers()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.38"/></svg>
@@ -934,6 +954,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 /* ============================================================  STATE  */
 const DEFAULT_CATS = ['Naczepa','Przyczepa','Ciągnik rolniczy'];
 const VAT = 0.23;
+const ALLOWED_DOMAINS = []; // np. ['@gmail.com', '@firma.pl'] — pusta = brak ograniczeń
 const LS = { theme:'katalog_theme', view:'katalog_view', zest:'katalog_zest' };
 
 let parts      = [];
@@ -945,6 +966,7 @@ let editLinkId = null;
 let linkSearch = '';
 let viewMode   = 'grid';
 let filterCat  = '';
+let drillCat   = '';
 let zestawienie = [];
 let importWb    = null;
 let editId              = null;
@@ -1010,16 +1032,21 @@ function updateUserInfo() {
 }
 
 function applyRoleUI() {
+  const isAdmin   = currentRole === 'admin';
   const canAdd    = ['nowy','editor','admin'].includes(currentRole);
   const canEdit   = ['editor','admin'].includes(currentRole);
   const btnAdd    = document.getElementById('btn-add-part');
   const btnLnk    = document.getElementById('btn-add-link');
   const btnImp    = document.getElementById('btn-import');
   const btnCat    = document.getElementById('btn-cat-mgr');
-  if (btnAdd) btnAdd.style.display = canAdd  ? '' : 'none';
-  if (btnLnk) btnLnk.style.display = canAdd  ? '' : 'none';
-  if (btnImp) btnImp.style.display = canEdit ? '' : 'none';
-  if (btnCat) btnCat.style.display = canEdit ? '' : 'none';
+  const btnExp    = document.getElementById('btn-export');
+  const btnSync   = document.getElementById('btn-sync');
+  if (btnAdd)  btnAdd.style.display  = canAdd  ? '' : 'none';
+  if (btnLnk)  btnLnk.style.display  = canAdd  ? '' : 'none';
+  if (btnImp)  btnImp.style.display  = isAdmin ? '' : 'none';
+  if (btnCat)  btnCat.style.display  = canEdit ? '' : 'none';
+  if (btnExp)  btnExp.style.display  = isAdmin ? '' : 'none';
+  if (btnSync) btnSync.style.display = isAdmin ? '' : 'none';
 }
 
 function showLogin() {
@@ -1043,6 +1070,7 @@ function showApp() {
   renderAll();
   updateZestFloat();
   initStarHover();
+  document.getElementById('print-date').textContent = 'Wydruk: ' + new Date().toLocaleDateString('pl-PL');
 }
 
 function setLoadingTxt(t) {
@@ -1054,6 +1082,10 @@ function setLoadingTxt(t) {
 async function sendMagicLink() {
   const email = document.getElementById('login-email').value.trim();
   if (!email) { loginMsg('Podaj adres e-mail', 'error'); return; }
+  if (ALLOWED_DOMAINS.length > 0 && !ALLOWED_DOMAINS.some(d => email.toLowerCase().endsWith(d.toLowerCase()))) {
+    loginMsg(`Logowanie dostępne tylko dla: ${ALLOWED_DOMAINS.join(', ')}`, 'error');
+    return;
+  }
   const btn = document.getElementById('login-btn');
   btn.disabled = true; btn.textContent = 'Wysyłanie…';
   const { error } = await sb.auth.signInWithOtp({
@@ -1137,7 +1169,20 @@ function toggleTheme() { applyTheme(document.documentElement.getAttribute('data-
 
 /* ============================================================  CATEGORIES  */
 function allCats() { return [...DEFAULT_CATS, ...customCats]; }
-function catIndex(cat) { const i = allCats().indexOf(cat); return i>=0 ? i%6 : 0; }
+function topCats() {
+  const tops = new Set(DEFAULT_CATS);
+  customCats.forEach(c => tops.add(c.split('/')[0]));
+  return [...tops];
+}
+function subCatsOf(top) {
+  return customCats
+    .filter(c => c.includes('/') && c.split('/')[0] === top)
+    .map(c => c.slice(c.indexOf('/')+1));
+}
+function catTop(path) { return (path||'').split('/')[0]; }
+function catSub(path) { const i=(path||'').indexOf('/'); return i>=0 ? path.slice(i+1) : null; }
+function countInTop(top) { return parts.filter(p=>catTop(p.category)===top).length; }
+function catIndex(cat) { const top = catTop(cat); const i = topCats().indexOf(top); return i>=0 ? i%6 : 0; }
 function catBadge(cat) { return `<span class="cat-badge cb-${catIndex(cat)}">${esc(cat)}</span>`; }
 function registerName(n) { n=n.trim(); if(n&&!partNames.includes(n)){partNames.push(n);partNames.sort((a,b)=>a.localeCompare(b,'pl'));} }
 
@@ -1147,14 +1192,19 @@ function getFiltered() {
   const [field,dir] = document.getElementById('sort-sel').value.split('_');
   const asc = dir==='asc';
   let result = parts.filter(p => {
-    if (filterCat && p.category !== filterCat) return false;
+    if (drillCat) {
+      if (catTop(p.category) !== drillCat) return false;
+      if (filterCat !== '' && p.category !== filterCat) return false;
+    } else if (filterCat !== '') {
+      if (catTop(p.category) !== filterCat) return false;
+    }
     if (q) { const hay=(p.name+' '+p.desc+' '+p.category).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
   result.sort((a,b) => {
     let va=a[field]??'', vb=b[field]??'';
-    if(field==='priceNet'){va=+va;vb=+vb;} else {va=String(va).toLowerCase();vb=String(vb).toLowerCase();}
-    return va<vb ? (asc?-1:1) : va>vb ? (asc?1:-1) : 0;
+    if(typeof va==='string') return asc ? va.localeCompare(vb,'pl') : vb.localeCompare(va,'pl');
+    return asc ? va-vb : vb-va;
   });
   return result;
 }
@@ -1164,30 +1214,62 @@ function renderAll() { renderCatFilter(); renderSummary(); renderContent(); upda
 
 function renderSummary() {
   const v = getFiltered();
-  const totalNet = v.reduce((s,p)=>s+(p.priceNet||0),0);
-  const avgNet   = v.length ? totalNet/v.length : 0;
   const cats = new Set(v.map(p=>p.category)).size;
+  const disc = Math.min(99, Math.max(0, parseFloat(document.getElementById('zest-disc')?.value)||0));
+  const factor = 1 - disc/100;
+  const zestItems = zestawienie.map(id=>parts.find(p=>p.id===id)).filter(Boolean);
+  let zNetAfter = 0, zGrossAfter = 0;
+  zestItems.forEach(p => {
+    if (p.priceNet != null) {
+      const na = round2(p.priceNet * factor);
+      zNetAfter   = round2(zNetAfter   + na);
+      zGrossAfter = round2(zGrossAfter + round2(na * (1+VAT)));
+    }
+  });
+  const zLabel = zestItems.length
+    ? `${fmtP(zNetAfter)} / ${fmtP(zGrossAfter)} zł`
+    : '—';
   document.getElementById('summary-bar').innerHTML = `
     <div class="chip"><span class="chip-val">${parts.length}</span><span class="chip-lbl">Części razem</span></div>
     <div class="chip"><span class="chip-val">${v.length}</span><span class="chip-lbl">Widocznych</span></div>
     <div class="chip"><span class="chip-val">${cats}</span><span class="chip-lbl">Kategorii</span></div>
-    <div class="chip"><span class="chip-val">${fmtP(totalNet)}</span><span class="chip-lbl">Suma netto</span></div>
-    <div class="chip"><span class="chip-val">${fmtP(avgNet)}</span><span class="chip-lbl">Śr. cena netto</span></div>
+    <div class="chip"><span class="chip-val">${zLabel}</span><span class="chip-lbl">Zestawienie netto/brutto</span></div>
   `;
 }
 
 function renderCatFilter() {
-  const cats = allCats();
-  const counts = parts.reduce((m,p)=>{ m[p.category]=(m[p.category]||0)+1; return m; },{});
   let html = '<span class="cat-filter-label">KAT:</span>';
-  html += `<button class="cat-chip${filterCat===''?' active':''}" data-cat="" onclick="setCat(this.dataset.cat)">Wszystkie (${parts.length})</button>`;
-  cats.forEach((c,i)=>{
-    html += `<button class="cat-chip${filterCat===c?' active':''}" data-cat="${esc(c)}" data-ci="${i%6}" onclick="setCat(this.dataset.cat)">${esc(c)} (${counts[c]||0})</button>`;
-  });
+  if (drillCat) {
+    html += `<button class="cat-chip" onclick="drillBack()">← Wróć</button>`;
+    html += `<span class="cat-drill-crumb">${esc(drillCat)} ›</span>`;
+    const allInTop = countInTop(drillCat);
+    html += `<button class="cat-chip${filterCat===''?' active':''}" onclick="setSubCat('')">Wszystkie (${allInTop})</button>`;
+    subCatsOf(drillCat).forEach(sub => {
+      const path = drillCat + '/' + sub;
+      const cnt = parts.filter(p=>p.category===path).length;
+      html += `<button class="cat-chip${filterCat===path?' active':''}" data-cat="${esc(path)}" onclick="setSubCat(this.dataset.cat)">${esc(sub)} (${cnt})</button>`;
+    });
+  } else {
+    html += `<button class="cat-chip${filterCat===''?' active':''}" data-cat="" onclick="setCat('')">Wszystkie (${parts.length})</button>`;
+    topCats().forEach((c,i) => {
+      const hasSubs = subCatsOf(c).length > 0;
+      const cnt = countInTop(c);
+      html += `<button class="cat-chip${filterCat===c?' active':''}" data-cat="${esc(c)}" data-ci="${i%6}" onclick="setCat(this.dataset.cat)">${esc(c)}${hasSubs?' ›':''} (${cnt})</button>`;
+    });
+  }
   document.getElementById('cat-filter').innerHTML = html;
 }
 
-function setCat(c) { filterCat=c; renderAll(); }
+function setCat(c) {
+  if (c !== '' && !drillCat && subCatsOf(c).length > 0) {
+    drillCat = c; filterCat = '';
+  } else {
+    filterCat = c;
+  }
+  renderAll();
+}
+function setSubCat(path) { filterCat = path; renderAll(); }
+function drillBack() { drillCat = ''; filterCat = ''; renderAll(); }
 
 function renderContent() {
   const filtered = getFiltered();
@@ -1242,7 +1324,7 @@ function renderTable(arr) {
     return `<tr class="${sel?'tr-selected':''}">
       <td class="chk-col"><input type="checkbox" ${sel?'checked':''} onchange="toggleSelect(${p.id})"></td>
       <td>${thumb}</td>
-      <td>${catBadge(p.category)}</td>
+      <td class="col-cat no-print">${catBadge(p.category)}</td>
       <td class="td-name">${esc(p.name)}</td>
       <td class="td-net">${p.priceNet!=null ? fmtPl(p.priceNet)+' zł' : '—'}</td>
       <td class="td-gross">${p.priceGross!=null ? fmtPl(p.priceGross)+' zł' : '—'}</td>
@@ -1257,7 +1339,7 @@ function renderTable(arr) {
     <thead><tr>
       <th class="chk-col nosort"></th>
       <th class="nosort"></th>
-      <th onclick="sortBy('category')" id="th-category">Kategoria <span class="si">↕</span></th>
+      <th onclick="sortBy('category')" id="th-category" class="no-print">Kategoria <span class="si">↕</span></th>
       <th onclick="sortBy('name')" id="th-name">Nazwa <span class="si">↕</span></th>
       <th onclick="sortBy('priceNet')" id="th-priceNet">Netto <span class="si">↕</span></th>
       <th class="nosort">Brutto</th>
@@ -1290,7 +1372,7 @@ function setView(mode) {
 function toggleSelect(id) {
   if (zestawienie.includes(id)) { zestawienie = zestawienie.filter(x=>x!==id); }
   else { zestawienie.push(id); }
-  save(); renderContent(); updateZestFloat();
+  save(); renderContent(); updateZestFloat(); renderSummary();
 }
 
 function updateZestFloat() {
@@ -1301,7 +1383,7 @@ function updateZestFloat() {
 }
 
 function openZest()  { renderZestTable(); document.getElementById('ov-zest').classList.add('open'); }
-function closeZest() { document.getElementById('ov-zest').classList.remove('open'); }
+function closeZest() { document.getElementById('ov-zest').classList.remove('open'); renderSummary(); }
 function clearZest() {
   if (!zestawienie.length) return;
   if (!confirm('Wyczyścić całe zestawienie?')) return;
@@ -1431,7 +1513,22 @@ function printZest() {
 
 /* ============================================================  ADD / EDIT  */
 function populateCatSelect() {
-  document.getElementById('m-cat').innerHTML = allCats().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  document.getElementById('m-cat').innerHTML = topCats().map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  updateSubcatSelect();
+}
+function updateSubcatSelect() {
+  const top = document.getElementById('m-cat').value;
+  const subs = subCatsOf(top);
+  const row = document.getElementById('subcat-row');
+  const sel = document.getElementById('m-subcat');
+  if (subs.length > 0) {
+    sel.innerHTML = `<option value="">(brak podkategorii)</option>` +
+      subs.map(s=>`<option value="${esc(top)}/${esc(s)}">${esc(s)}</option>`).join('');
+    row.style.display = '';
+  } else {
+    row.style.display = 'none';
+    sel.innerHTML = '';
+  }
 }
 function populateNameDatalist() {
   document.getElementById('name-list').innerHTML = partNames.map(n=>`<option value="${esc(n)}">`).join('');
@@ -1453,7 +1550,10 @@ function openEdit(id) {
   editId=id; pendingPhotoDataUrl=p.photo||null; pendingPhotoOrig=null; pendingPhotoFile=null;
   document.getElementById('modal-title').textContent='// Edytuj część';
   populateCatSelect(); populateNameDatalist();
-  document.getElementById('m-cat').value   = p.category;
+  document.getElementById('m-cat').value = catTop(p.category);
+  updateSubcatSelect();
+  const sub = catSub(p.category);
+  if (sub) document.getElementById('m-subcat').value = p.category;
   document.getElementById('m-name').value  = p.name;
   document.getElementById('m-net').value   = p.priceNet  !=null ? p.priceNet  : '';
   document.getElementById('m-gross').value = p.priceGross!=null ? p.priceGross: '';
@@ -1466,7 +1566,10 @@ function openEdit(id) {
 function closePart() { document.getElementById('ov-part').classList.remove('open'); editId=null; }
 
 async function savePart() {
-  const cat      = document.getElementById('m-cat').value;
+  const topCat   = document.getElementById('m-cat').value;
+  const subRow   = document.getElementById('subcat-row');
+  const subVal   = document.getElementById('m-subcat').value;
+  const cat      = (subRow.style.display !== 'none' && subVal) ? subVal : topCat;
   const name     = document.getElementById('m-name').value.trim();
   const netRaw   = document.getElementById('m-net').value;
   const grossRaw = document.getElementById('m-gross').value;
@@ -1584,16 +1687,34 @@ async function confirmDel() {
 function openCatMgr()  { renderCatList(); document.getElementById('ov-cat').classList.add('open'); }
 function closeCatMgr() { document.getElementById('ov-cat').classList.remove('open'); }
 function renderCatList() {
-  document.getElementById('cat-list').innerHTML = allCats().map((c,i)=>{
-    const isFixed=DEFAULT_CATS.includes(c);
-    const cnt=parts.filter(p=>p.category===c).length;
+  document.getElementById('cat-list').innerHTML = topCats().map((c,i) => {
+    const isFixed = DEFAULT_CATS.includes(c);
+    const cnt = countInTop(c);
+    const subs = subCatsOf(c);
+    const subsHtml = subs.map(sub => {
+      const path = c + '/' + sub;
+      const subCnt = parts.filter(p=>p.category===path).length;
+      return `<div class="cat-sub-item">
+        <span class="cat-badge cb-${i%6}" style="font-size:.65rem">${esc(sub)}</span>
+        <span style="font-size:.75rem;color:var(--text-dim);font-family:var(--mono)">(${subCnt})</span>
+        <button class="btn-icon" data-cat="${esc(path)}" onclick="removeCat(this.dataset.cat)" style="color:var(--danger)" title="Usuń podkategorię"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>`;
+    }).join('');
     return `<div class="cat-item${isFixed?' fixed':''}">
       <div class="cat-item-left">
         <span class="cat-badge cb-${i%6}">${esc(c)}</span>
         <span style="font-size:.8rem;color:var(--text-dim);font-family:var(--mono)">(${cnt} cz.)</span>
         ${isFixed?'<span class="cat-fixed-badge">[domyślna]</span>':''}
       </div>
-      ${!isFixed?`<button class="btn-icon" onclick="removeCat(${JSON.stringify(c)})" style="color:var(--danger)" title="Usuń"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`:''}
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-outline btn-xs" data-top="${esc(c)}" onclick="showSubCatAdd(this.dataset.top)">+ podkat.</button>
+        ${!isFixed?`<button class="btn-icon" data-cat="${esc(c)}" onclick="removeCat(this.dataset.cat)" style="color:var(--danger)" title="Usuń kategorię"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`:''}
+      </div>
+    </div>
+    ${subsHtml ? `<div class="cat-sublist">${subsHtml}</div>` : ''}
+    <div class="cat-subcat-add" data-top="${esc(c)}" style="display:none">
+      <input type="text" class="subcat-inp" placeholder="Nazwa podkategorii…" onkeydown="if(event.key==='Enter')addSubCat(this.closest('.cat-subcat-add').dataset.top)">
+      <button class="btn btn-primary btn-xs" onclick="addSubCat(this.closest('.cat-subcat-add').dataset.top)">Dodaj</button>
     </div>`;
   }).join('');
 }
@@ -1607,12 +1728,55 @@ async function addCat() {
   toast(`Kategoria "${val}" dodana`,'success');
 }
 async function removeCat(cat) {
-  const cnt=parts.filter(p=>p.category===cat).length;
-  if(cnt>0&&!confirm(`Kategoria "${cat}" ma ${cnt} części. Usunąć kategorię?`)) return;
-  const { error } = await sb.from('custom_cats').delete().eq('name', cat);
-  if (error) { toast('Błąd: '+error.message,'error'); return; }
-  customCats=customCats.filter(c=>c!==cat); renderCatList(); renderCatFilter(); populateCatSelect();
+  const isSub = cat.includes('/');
+  const top = catTop(cat);
+  if (isSub) {
+    const cnt = parts.filter(p=>p.category===cat).length;
+    if (cnt>0&&!confirm(`Podkategoria "${cat}" ma ${cnt} części. Usunąć podkategorię?`)) return;
+    const { error } = await sb.from('custom_cats').delete().eq('name', cat);
+    if (error) { toast('Błąd: '+error.message,'error'); return; }
+    customCats = customCats.filter(c=>c!==cat);
+  } else {
+    const subPaths = customCats.filter(c=>c.includes('/')&&catTop(c)===cat);
+    const cntDirect = parts.filter(p=>p.category===cat).length;
+    const cntSub = parts.filter(p=>catTop(p.category)===cat&&p.category!==cat).length;
+    const totalCnt = cntDirect + cntSub;
+    const subMsg = subPaths.length>0 ? ` i ${subPaths.length} podkategorii` : '';
+    if ((totalCnt>0||subPaths.length>0)&&!confirm(`Kategoria "${cat}"${subMsg} ma łącznie ${totalCnt} części. Usunąć kategorię i wszystkie jej podkategorie?`)) return;
+    const toDelete = [cat, ...subPaths];
+    const { error } = await sb.from('custom_cats').delete().in('name', toDelete);
+    if (error) { toast('Błąd: '+error.message,'error'); return; }
+    customCats = customCats.filter(c=>!toDelete.includes(c));
+    if (drillCat === cat) { drillCat = ''; filterCat = ''; }
+  }
+  renderCatList(); renderCatFilter(); populateCatSelect();
   toast(`Kategoria "${cat}" usunięta`,'info');
+}
+function showSubCatAdd(top) {
+  document.querySelectorAll('.cat-subcat-add').forEach(el => {
+    if (el.dataset.top === top) {
+      const showing = el.style.display !== 'none';
+      el.style.display = showing ? 'none' : 'flex';
+      if (!showing) el.querySelector('input')?.focus();
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+async function addSubCat(top) {
+  const el = document.querySelector(`.cat-subcat-add[data-top="${CSS.escape(top)}"]`);
+  if (!el) return;
+  const inp = el.querySelector('input');
+  const sub = (inp?.value||'').trim();
+  if (!sub) return;
+  if (sub.includes('/')) { toast('Nazwa podkategorii nie może zawierać znaku "/"','error'); return; }
+  const path = `${top}/${sub}`;
+  if (customCats.includes(path)) { toast('Podkategoria już istnieje','error'); return; }
+  const { error } = await sb.from('custom_cats').insert({ name: path });
+  if (error) { toast('Błąd: '+error.message,'error'); return; }
+  customCats.push(path); inp.value='';
+  renderCatList(); renderCatFilter(); populateCatSelect();
+  toast(`Podkategoria "${sub}" dodana do "${top}"`,'success');
 }
 
 /* ============================================================  SYNC / JSON  */
@@ -1789,12 +1953,15 @@ function closeAdmin() { document.getElementById('ov-admin').classList.remove('op
 async function renderAdminUsers() {
   const wrap = document.getElementById('admin-users-list');
   wrap.innerHTML = '<div class="admin-empty">Ładowanie…</div>';
+  document.getElementById('btn-del-selected').style.display = 'none';
+  document.getElementById('del-sel-count').textContent = '0';
   const { data, error } = await sb.from('profiles').select('*').order('email');
   if (error) { wrap.innerHTML=`<div class="admin-empty" style="color:var(--danger)">${error.message}</div>`; return; }
   if (!data?.length) { wrap.innerHTML='<div class="admin-empty">Brak użytkowników w bazie.</div>'; return; }
-  wrap.innerHTML = data.map(u=>{
+  wrap.innerHTML = data.map(u => {
     const isSelf = u.id === currentUser?.id;
     return `<div class="admin-user-row${isSelf?' admin-self':''}">
+      ${isSelf ? '<span style="width:16px"></span>' : `<input type="checkbox" class="admin-user-chk" data-uid="${u.id}" data-email="${esc(u.email||u.id)}" onchange="updateDelBtn()">`}
       <span class="admin-email">${esc(u.email||u.id)}</span>
       ${isSelf ? `<span class="role-badge role-${u.role}">${u.role.toUpperCase()} (Ty)</span>` :
         `<select class="admin-role-sel" data-uid="${u.id}" onchange="changeUserRole(this)">
@@ -1812,6 +1979,26 @@ async function changeUserRole(sel) {
   const { error } = await sb.from('profiles').update({ role }).eq('id', uid);
   if (error) { toast('Błąd: '+error.message,'error'); return; }
   toast(`Rola zmieniona na "${role}"`, 'success');
+}
+
+function updateDelBtn() {
+  const checked = document.querySelectorAll('.admin-user-chk:checked');
+  const btn = document.getElementById('btn-del-selected');
+  const cnt = document.getElementById('del-sel-count');
+  cnt.textContent = checked.length;
+  btn.style.display = checked.length > 0 ? '' : 'none';
+}
+
+async function deleteSelectedUsers() {
+  const checked = [...document.querySelectorAll('.admin-user-chk:checked')];
+  if (!checked.length) return;
+  const emails = checked.map(c => c.dataset.email).join('\n');
+  if (!confirm(`Usunąć ${checked.length} użytkownik(ów)?\n\n${emails}\n\nTa operacja jest nieodwracalna.`)) return;
+  const ids = checked.map(c => c.dataset.uid);
+  const { error } = await sb.rpc('delete_users', { user_ids: ids });
+  if (error) { toast('Błąd usuwania: ' + error.message, 'error'); return; }
+  toast(`Usunięto ${ids.length} użytkownik(ów)`, 'success');
+  await renderAdminUsers();
 }
 
 /* ============================================================  HELPERS  */
